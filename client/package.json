@@ -8,7 +8,7 @@
     "predev": "npm run provision",
     "dev": "vite",
     "prebuild": "npm run provision",
-    "build": "node node_modules/typescript/bin/tsc && vite build",
+    "build": "node node_modules/typescript/bin/tsc && node node_modules/vite/bin/vite.js build",
     "preview": "vite preview"
   },
   "dependencies": {
