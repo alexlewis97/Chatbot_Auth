@@ -8,7 +8,7 @@
     "predev": "npm run provision",
     "dev": "vite",
     "prebuild": "npm run provision",
-    "build": "tsc && vite build",
+    "build": "npx tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
