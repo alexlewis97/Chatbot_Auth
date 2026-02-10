@@ -2,19 +2,22 @@ import { useEffect, useState } from 'react';
 import { getChatbots } from '../services/chatbots';
 import { getUserGroups } from '../services/userGroups';
 import { getAllPermissions } from '../services/permissions';
+import { useAuthReady } from '../App';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ chatbots: 0, groups: 0, permissions: 0 });
   const [loading, setLoading] = useState(true);
+  const authReady = useAuthReady();
 
   useEffect(() => {
+    if (!authReady) return;
     Promise.all([getChatbots(), getUserGroups(), getAllPermissions()])
       .then(([bots, groups, perms]) => {
         setStats({ chatbots: bots.length, groups: groups.length, permissions: perms.length });
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [authReady]);
 
   if (loading) return <div className="flex justify-center p-10"><span className="loading loading-lg" /></div>;
 

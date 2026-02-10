@@ -3,8 +3,9 @@ import { getCurrentUserId } from './auth';
 import type { UserGroup, UserGroupMember } from '../types';
 
 export async function getUserGroups(): Promise<UserGroup[]> {
-  const { data, error } = await supabase.from('user_groups').select('*').order('name');
-  if (error) throw error;
+  const { data, error, status } = await supabase.from('user_groups').select('*').order('name');
+  console.log('[user_groups] select response:', { data, error, status });
+  if (error) throw new Error(`שגיאה בטעינת קבוצות (${status}): ${error.message}`);
   return data ?? [];
 }
 

@@ -2,31 +2,36 @@ import { useEffect, useState } from 'react';
 import { getUserGroups, createUserGroup, deleteUserGroup, getGroupMembers, addGroupMember, removeGroupMember } from '../services/userGroups';
 import { getUserProfiles } from '../services/userProfiles';
 import type { UserGroup, UserGroupMember, UserProfile } from '../types';
+import { useAuthReady } from '../App';
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<UserGroup[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [members, setMembers] = useState<UserGroupMember[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
+  const authReady = useAuthReady();
 
   async function load() {
     setLoading(true);
+    setError('');
     try {
       const [g, u] = await Promise.all([getUserGroups(), getUserProfiles()]);
       setGroups(g);
       setUsers(u);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || 'שגיאה בטעינת קבוצות');
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (authReady) load(); }, [authReady]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -74,11 +79,18 @@ export default function GroupsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">👥 קבוצות משתמשים</h1>
+        <h1 className="text-2xl font-bold">👥 קבוצות משתמשים ({groups.length})</h1>
         <button className="btn btn-primary btn-sm" onClick={() => setShowForm(!showForm)}>
           {showForm ? 'ביטול' : '+ קבוצה חדשה'}
         </button>
       </div>
+
+      {error && (
+        <div className="alert alert-error mb-4">
+          <span>{error}</span>
+          <span className="text-xs opacity-70">ייתכן שחסרות הרשאות RLS — ראה scripts/setup-rls.sql</span>
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleCreate} className="card bg-base-100 shadow p-4 mb-6 flex flex-col gap-3">

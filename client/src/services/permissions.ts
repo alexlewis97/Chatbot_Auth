@@ -13,11 +13,12 @@ export async function getPermissionsForChatbot(chatbotId: string): Promise<Chatb
 }
 
 export async function getAllPermissions(): Promise<ChatbotPermission[]> {
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('chatbot_permissions')
     .select('*')
     .order('granted_at', { ascending: false });
-  if (error) throw error;
+  console.log('[chatbot_permissions] select response:', { data, error, status });
+  if (error) throw new Error(`שגיאה בטעינת הרשאות (${status}): ${error.message}`);
   return data ?? [];
 }
 

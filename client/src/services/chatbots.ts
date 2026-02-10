@@ -3,8 +3,9 @@ import { getCurrentUserId } from './auth';
 import type { Chatbot } from '../types';
 
 export async function getChatbots(): Promise<Chatbot[]> {
-  const { data, error } = await supabase.from('chatbots').select('*').order('created_at', { ascending: false });
-  if (error) throw error;
+  const { data, error, status } = await supabase.from('chatbots').select('*').order('created_at', { ascending: false });
+  console.log('[chatbots] select response:', { data, error, status });
+  if (error) throw new Error(`שגיאה בטעינת צ'אטבוטים (${status}): ${error.message}`);
   return data ?? [];
 }
 

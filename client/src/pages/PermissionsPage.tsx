@@ -4,6 +4,7 @@ import { getChatbots } from '../services/chatbots';
 import { getUserGroups } from '../services/userGroups';
 import { getUserProfiles } from '../services/userProfiles';
 import type { ChatbotPermission, Chatbot, UserGroup, UserProfile } from '../types';
+import { useAuthReady } from '../App';
 
 type GrantMode = 'user' | 'group';
 
@@ -19,6 +20,7 @@ export default function PermissionsPage() {
   const [selectedChatbot, setSelectedChatbot] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('');
   const [permType, setPermType] = useState('use');
+  const authReady = useAuthReady();
 
   async function load() {
     setLoading(true);
@@ -37,7 +39,7 @@ export default function PermissionsPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (authReady) load(); }, [authReady]);
 
   async function handleGrant(e: React.FormEvent) {
     e.preventDefault();

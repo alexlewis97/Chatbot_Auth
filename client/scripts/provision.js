@@ -102,6 +102,62 @@ const tables = [
   chatbotPermissionsTable,
 ];
 
+// ---------- RLS Policies ----------
+// These ensure authenticated users can read/write all tables.
+// In production, replace with stricter role-based policies.
+
+const rlsPolicies = [
+  // Enable RLS on all tables
+  'ALTER TABLE public.chatbots ENABLE ROW LEVEL SECURITY',
+  'ALTER TABLE public.user_groups ENABLE ROW LEVEL SECURITY',
+  'ALTER TABLE public.user_group_members ENABLE ROW LEVEL SECURITY',
+  'ALTER TABLE public.chatbot_permissions ENABLE ROW LEVEL SECURITY',
+  'ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY',
+
+  // chatbots: authenticated can read, insert, update, delete
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'chatbots_select_auth' AND tablename = 'chatbots') THEN CREATE POLICY "chatbots_select_auth" ON public.chatbots FOR SELECT TO authenticated USING (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'chatbots_insert_auth' AND tablename = 'chatbots') THEN CREATE POLICY "chatbots_insert_auth" ON public.chatbots FOR INSERT TO authenticated WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'chatbots_update_auth' AND tablename = 'chatbots') THEN CREATE POLICY "chatbots_update_auth" ON public.chatbots FOR UPDATE TO authenticated USING (true) WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'chatbots_delete_auth' AND tablename = 'chatbots') THEN CREATE POLICY "chatbots_delete_auth" ON public.chatbots FOR DELETE TO authenticated USING (true); END IF; END $$`,
+
+  // user_groups
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'user_groups_select_auth' AND tablename = 'user_groups') THEN CREATE POLICY "user_groups_select_auth" ON public.user_groups FOR SELECT TO authenticated USING (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'user_groups_insert_auth' AND tablename = 'user_groups') THEN CREATE POLICY "user_groups_insert_auth" ON public.user_groups FOR INSERT TO authenticated WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'user_groups_update_auth' AND tablename = 'user_groups') THEN CREATE POLICY "user_groups_update_auth" ON public.user_groups FOR UPDATE TO authenticated USING (true) WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'user_groups_delete_auth' AND tablename = 'user_groups') THEN CREATE POLICY "user_groups_delete_auth" ON public.user_groups FOR DELETE TO authenticated USING (true); END IF; END $$`,
+
+  // user_group_members
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'ugm_select_auth' AND tablename = 'user_group_members') THEN CREATE POLICY "ugm_select_auth" ON public.user_group_members FOR SELECT TO authenticated USING (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'ugm_insert_auth' AND tablename = 'user_group_members') THEN CREATE POLICY "ugm_insert_auth" ON public.user_group_members FOR INSERT TO authenticated WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'ugm_delete_auth' AND tablename = 'user_group_members') THEN CREATE POLICY "ugm_delete_auth" ON public.user_group_members FOR DELETE TO authenticated USING (true); END IF; END $$`,
+
+  // chatbot_permissions
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'cp_select_auth' AND tablename = 'chatbot_permissions') THEN CREATE POLICY "cp_select_auth" ON public.chatbot_permissions FOR SELECT TO authenticated USING (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'cp_insert_auth' AND tablename = 'chatbot_permissions') THEN CREATE POLICY "cp_insert_auth" ON public.chatbot_permissions FOR INSERT TO authenticated WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'cp_delete_auth' AND tablename = 'chatbot_permissions') THEN CREATE POLICY "cp_delete_auth" ON public.chatbot_permissions FOR DELETE TO authenticated USING (true); END IF; END $$`,
+
+  // user_profiles
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'up_select_auth' AND tablename = 'user_profiles') THEN CREATE POLICY "up_select_auth" ON public.user_profiles FOR SELECT TO authenticated USING (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'up_insert_auth' AND tablename = 'user_profiles') THEN CREATE POLICY "up_insert_auth" ON public.user_profiles FOR INSERT TO authenticated WITH CHECK (true); END IF; END $$`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'up_update_auth' AND tablename = 'user_profiles') THEN CREATE POLICY "up_update_auth" ON public.user_profiles FOR UPDATE TO authenticated USING (true) WITH CHECK (true); END IF; END $$`,
+];
+
+async function executeSQL(sql) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/execute_create_table`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY}`,
+      'apikey': SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ p_sql: sql }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+}
+
 async function provision() {
   console.log('[provision] Starting table provisioning...');
   for (const schema of tables) {
@@ -110,6 +166,16 @@ async function provision() {
       console.error(`[provision] ✗ Failed to create "${schema.table}":`, error.message || error);
     } else {
       console.log(`[provision] ✓ ${schema.table}`, data?.sql ? '(created/verified)' : '');
+    }
+  }
+
+  console.log('[provision] Setting up RLS policies...');
+  for (const sql of rlsPolicies) {
+    try {
+      await executeSQL(sql);
+    } catch (err) {
+      // Policy may already exist or RPC may not support DO blocks — log and continue
+      console.warn(`[provision] ⚠ RLS policy warning:`, err.message?.slice(0, 120));
     }
   }
   console.log('[provision] Done.');
